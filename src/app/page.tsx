@@ -1,113 +1,219 @@
-import Image from "next/image";
+"use client";
+import { Solution, solveKTAsync } from "@/core/kt-backtracking";
+import findElementIn2DArray from "@/utils/find-element-in-2d-array";
+import * as React from "react";
+import { Knight } from "./Knight";
 
-export default function Home() {
+const BOARD_WIDTH = 800;
+const BOARD_HEIGHT = 800;
+
+interface Line {
+  x1: number;
+  y1: number;
+  angle: number;
+  width: number;
+}
+
+const Home = () => {
+  const [knightPosition, setKnightPosition] = React.useState({
+    x: 0,
+    y: 0,
+  });
+  const [N, setN] = React.useState(5);
+  const [animationOn, setAnimationOn] = React.useState(false);
+  const [lines, setLines] = React.useState<Line[]>([]);
+  const [hasSolution, setHasSolution] = React.useState(false);
+  const [completed, setCompleted] = React.useState(false);
+  const [calculationTime, setCalculationTime] = React.useState(0);
+  const [startingPosition, setStartingPosition] = React.useState({
+    x: 0,
+    y: 0,
+  });
+
+  const cellWidth = BOARD_WIDTH / N;
+
+  const animateSolution = (solution: Solution) => {
+    return new Promise<void>((resolve) => {
+      if (solution.length === 0) return;
+      let i = 1;
+      let currentX = knightPosition.x;
+      let currentY = knightPosition.y;
+      const interval = setInterval(() => {
+        if (i >= N * N) {
+          clearInterval(interval);
+          resolve();
+        }
+        const element = findElementIn2DArray(solution, i);
+        if (element) {
+          setKnightPosition({ x: element[0], y: element[1] });
+
+          const width = Math.sqrt(
+            Math.pow(element[0] - currentX, 2) +
+              Math.pow(element[1] - currentY, 2),
+          );
+
+          const angle =
+            Math.atan2(element[1] - currentY, element[0] - currentX) *
+            (180 / Math.PI);
+
+          const newLine = {
+            x1: currentX,
+            y1: currentY,
+            angle: angle,
+            width,
+          };
+
+          setLines((prev) => [...prev, newLine]);
+
+          currentX = element[0];
+          currentY = element[1];
+        }
+        i++;
+      }, 300);
+    });
+  };
+
+  const startKnightsTour = async () => {
+    setCompleted(false);
+    setLines([]);
+    setStartingPosition(knightPosition);
+    console.log(knightPosition);
+    const start = performance.now();
+    const res = await solveKTAsync(knightPosition.x, knightPosition.y, N);
+    const end = performance.now();
+    setCompleted(true);
+    setCalculationTime(end - start);
+    setHasSolution(!!res);
+
+    if (res) {
+      setAnimationOn(true);
+      await animateSolution(res as Solution);
+      setAnimationOn(false);
+    } else {
+      alert("Solution does not exist");
+      setAnimationOn(false);
+    }
+  };
+
+  const renderSquare = (row: number, col: number) => {
+    const isDark = (row + col) % 2 === 1;
+    return (
+      <div
+        key={`${row}-${col}`}
+        className={isDark ? "bg-[#AE8A68]" : "bg-[#ECDAB9]"}
+        style={{
+          width: BOARD_WIDTH / N,
+          height: BOARD_HEIGHT / N,
+        }}
+      />
+    );
+  };
+
+  const renderBoard = () => {
+    let board = [];
+    for (let row = 0; row < N; row++) {
+      for (let col = 0; col < N; col++) {
+        board.push(renderSquare(row, col));
+      }
+    }
+    return board;
+  };
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 w-full max-w-5xl items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">src/app/page.tsx</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:size-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{" "}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
-        </div>
-      </div>
+    <div className="grid items-center justify-center">
+      <div className="flex items-center justify-center gap-3">
+        <label htmlFor="N">Rozmiar planszy</label>
+        <input
+          type="number"
+          disabled={animationOn}
+          defaultValue={N}
+          onChange={(e) => {
+            const n = parseInt(e.target.value);
+            setLines([]);
 
-      <div className="relative z-[-1] flex place-items-center before:absolute before:h-[300px] before:w-full before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-full after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700 before:dark:opacity-10 after:dark:from-sky-900 after:dark:via-[#0141ff] after:dark:opacity-40 sm:before:w-[480px] sm:after:w-[240px] before:lg:h-[360px]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
+            if (n && n < 100) {
+              setN(parseInt(e.target.value));
+              setKnightPosition({ x: 0, y: 0 });
+            }
+          }}
+          className="border border-gray-300 rounded h-10 w-36 text-black"
+        />
+        <label htmlFor="N">Pozycja konia (x,y)</label>
+        <input
+          defaultValue={`${knightPosition.x},${knightPosition.y}`}
+          type="text"
+          disabled={animationOn}
+          onChange={(e) => {
+            const [x, y] = e.target.value.split(",");
+            const xInt = parseInt(x);
+            const yInt = parseInt(y);
+            setLines([]);
+            if (xInt >= 0 && xInt < N && yInt >= 0 && yInt < N) {
+              setKnightPosition({ x: xInt, y: yInt });
+            }
+          }}
+          className="border border-gray-300 rounded h-10 w-36 text-black"
+        />
+        <button
+          disabled={animationOn}
+          className="bg-blue-500 text-white px-4 py-2 rounded my-4 disabled:bg-blue-300 disabled:text-gray-500"
+          onClick={() => startKnightsTour()}
+        >
+          Start Knights Tour
+        </button>
+      </div>
+      {completed && (
+        <div className="flex items-center p-2 justify-center">
+          {hasSolution ? "Rozwiązanie istnieje" : "Rozwiązanie nie istnieje"}.
+          Czas wykonania algorytmu: {calculationTime.toFixed(2)} ms
+        </div>
+      )}
+      <div
+        className="grid grid-cols-5 grid-rows-5 w-80 h-80 relative"
+        style={{
+          width: BOARD_WIDTH,
+          height: BOARD_HEIGHT,
+          gridTemplateColumns: `repeat(${N}, 1fr)`,
+          gridTemplateRows: `repeat(${N}, 1fr)`,
+        }}
+      >
+        <div
+          style={{
+            width: BOARD_WIDTH / N,
+            height: BOARD_HEIGHT / N,
+            top: knightPosition.y * (BOARD_HEIGHT / N),
+            left: knightPosition.x * (BOARD_WIDTH / N),
+          }}
+          className="absolute transition-all duration-200 ease-out"
+        >
+          <Knight />
+        </div>
+        {renderBoard()}
+        {lines.map((line, index) => (
+          <div
+            key={index}
+            className="absolute"
+            style={{
+              width: line.width * cellWidth,
+              height: 2,
+              top: line.y1 * cellWidth + cellWidth / 2,
+              left: line.x1 * cellWidth + cellWidth / 2,
+              transform: `rotate(${line.angle}deg)`,
+              backgroundColor: "#ff0000",
+              transformOrigin: "0 0",
+            }}
+          />
+        ))}
+        <div
+          className="bg-[#ff0000] w-3 h-3 rounded-full absolute"
+          style={{
+            top: startingPosition.y * cellWidth + cellWidth / 2 - 6,
+            left: startingPosition.x * cellWidth + cellWidth / 2 - 6,
+          }}
         />
       </div>
-
-      <div className="mb-32 grid text-center lg:mb-0 lg:w-full lg:max-w-5xl lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className="mb-3 text-2xl font-semibold">
-            Docs{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className="m-0 max-w-[30ch] text-sm opacity-50">
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className="mb-3 text-2xl font-semibold">
-            Learn{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className="m-0 max-w-[30ch] text-sm opacity-50">
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className="mb-3 text-2xl font-semibold">
-            Templates{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className="m-0 max-w-[30ch] text-sm opacity-50">
-            Explore starter templates for Next.js.
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className="mb-3 text-2xl font-semibold">
-            Deploy{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className="m-0 max-w-[30ch] text-balance text-sm opacity-50">
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
+    </div>
   );
-}
+};
+
+export default Home;
