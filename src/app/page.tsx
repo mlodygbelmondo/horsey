@@ -1,5 +1,5 @@
 "use client";
-import { Solution, solveKTAsync } from "@/core/kt-backtracking";
+import { Solution } from "@/core/kt-backtracking";
 import findElementIn2DArray from "@/utils/find-element-in-2d-array";
 import * as React from "react";
 import { Knight } from "./Knight";
@@ -14,86 +14,111 @@ interface Line {
   width: number;
 }
 
+interface BacktrackingAlgorithmWorkerMessage {
+  solution: Solution;
+  calculationTime: number;
+}
+
 const Home = () => {
   const [knightPosition, setKnightPosition] = React.useState({
     x: 0,
     y: 0,
   });
   const [N, setN] = React.useState(5);
-  const [animationOn, setAnimationOn] = React.useState(false);
   const [lines, setLines] = React.useState<Line[]>([]);
   const [hasSolution, setHasSolution] = React.useState(false);
   const [completed, setCompleted] = React.useState(false);
+  const [calculating, setCalculating] = React.useState(false);
   const [calculationTime, setCalculationTime] = React.useState(0);
   const [startingPosition, setStartingPosition] = React.useState({
     x: 0,
     y: 0,
   });
 
+  const backtrackingAlgorithmWorker = React.useRef<Worker>();
+
   const cellWidth = BOARD_WIDTH / N;
 
-  const animateSolution = (solution: Solution) => {
-    return new Promise<void>((resolve) => {
-      if (solution.length === 0) return;
-      let i = 1;
-      let currentX = knightPosition.x;
-      let currentY = knightPosition.y;
-      const interval = setInterval(() => {
-        if (i >= N * N) {
-          clearInterval(interval);
-          resolve();
-        }
-        const element = findElementIn2DArray(solution, i);
-        if (element) {
-          setKnightPosition({ x: element[0], y: element[1] });
-
-          const width = Math.sqrt(
-            Math.pow(element[0] - currentX, 2) +
-              Math.pow(element[1] - currentY, 2),
-          );
-
-          const angle =
-            Math.atan2(element[1] - currentY, element[0] - currentX) *
-            (180 / Math.PI);
-
-          const newLine = {
-            x1: currentX,
-            y1: currentY,
-            angle: angle,
-            width,
-          };
-
-          setLines((prev) => [...prev, newLine]);
-
-          currentX = element[0];
-          currentY = element[1];
-        }
-        i++;
-      }, 300);
-    });
-  };
-
   const startKnightsTour = async () => {
-    setCompleted(false);
-    setLines([]);
-    setStartingPosition(knightPosition);
-    console.log(knightPosition);
-    const start = performance.now();
-    const res = await solveKTAsync(knightPosition.x, knightPosition.y, N);
-    const end = performance.now();
-    setCompleted(true);
-    setCalculationTime(end - start);
-    setHasSolution(!!res);
+    if (backtrackingAlgorithmWorker.current) {
+      setCompleted(false);
+      setCalculating(true);
+      setLines([]);
+      setStartingPosition(knightPosition);
 
-    if (res) {
-      setAnimationOn(true);
-      await animateSolution(res as Solution);
-      setAnimationOn(false);
-    } else {
-      alert("Solution does not exist");
-      setAnimationOn(false);
+      backtrackingAlgorithmWorker.current.postMessage({
+        startingX: knightPosition.x,
+        startingY: knightPosition.y,
+        N,
+      });
     }
   };
+
+  React.useEffect(() => {
+    backtrackingAlgorithmWorker.current = new Worker(
+      new URL("../workers/backtracking-algorithm-worker.ts", import.meta.url),
+    );
+
+    const animateSolution = (solution: Solution) => {
+      return new Promise<void>((resolve) => {
+        if (solution.length === 0) return;
+        let i = 1;
+        let currentX = knightPosition.x;
+        let currentY = knightPosition.y;
+        const interval = setInterval(() => {
+          if (i >= N * N) {
+            clearInterval(interval);
+            resolve();
+          }
+          const element = findElementIn2DArray(solution, i);
+          if (element) {
+            setKnightPosition({ x: element[0], y: element[1] });
+
+            const width = Math.sqrt(
+              Math.pow(element[0] - currentX, 2) +
+                Math.pow(element[1] - currentY, 2),
+            );
+
+            const angle =
+              Math.atan2(element[1] - currentY, element[0] - currentX) *
+              (180 / Math.PI);
+
+            const newLine = {
+              x1: currentX,
+              y1: currentY,
+              angle: angle,
+              width,
+            };
+
+            setLines((prev) => [...prev, newLine]);
+
+            currentX = element[0];
+            currentY = element[1];
+          }
+          i++;
+        }, 300);
+      });
+    };
+
+    if (backtrackingAlgorithmWorker.current) {
+      backtrackingAlgorithmWorker.current.onmessage = async (
+        e: MessageEvent<BacktrackingAlgorithmWorkerMessage>,
+      ) => {
+        const { calculationTime, solution } = e.data;
+
+        setCompleted(true);
+        setHasSolution(!!solution);
+        setCalculationTime(calculationTime);
+        if (solution) {
+          await animateSolution(solution);
+        } else {
+          console.log("Solution does not exist");
+          alert("Rozwiązanie nie istnieje");
+        }
+        setCalculating(false);
+      };
+    }
+  }, [N, backtrackingAlgorithmWorker, knightPosition.x, knightPosition.y]);
 
   const renderSquare = (row: number, col: number) => {
     const isDark = (row + col) % 2 === 1;
@@ -119,13 +144,20 @@ const Home = () => {
     return board;
   };
 
+  const terminateBacktrackingAlgorithmWorker = () => {
+    backtrackingAlgorithmWorker.current?.terminate();
+    setCalculating(false);
+    setCompleted(false);
+    setHasSolution(false);
+  };
+
   return (
     <div className="grid items-center justify-center">
-      <div className="flex items-center justify-center gap-3">
+      <div className="flex items-center justify-center gap-3 mt-5">
         <label htmlFor="N">Rozmiar planszy</label>
         <input
           type="number"
-          disabled={animationOn}
+          disabled={calculating}
           defaultValue={N}
           onChange={(e) => {
             const n = parseInt(e.target.value);
@@ -142,7 +174,7 @@ const Home = () => {
         <input
           defaultValue={`${knightPosition.x},${knightPosition.y}`}
           type="text"
-          disabled={animationOn}
+          disabled={calculating}
           onChange={(e) => {
             const [x, y] = e.target.value.split(",");
             const xInt = parseInt(x);
@@ -154,20 +186,32 @@ const Home = () => {
           }}
           className="border border-gray-300 rounded h-10 w-36 text-black"
         />
+      </div>
+      <div className="flex items-center justify-center gap-3">
         <button
-          disabled={animationOn}
+          disabled={calculating}
           className="bg-blue-500 text-white px-4 py-2 rounded my-4 disabled:bg-blue-300 disabled:text-gray-500"
           onClick={() => startKnightsTour()}
         >
-          Start Knights Tour
+          Oblicz trasę skoczka
+        </button>
+        <button
+          className="bg-red-500 text-white px-4 py-2 rounded my-4"
+          onClick={() => terminateBacktrackingAlgorithmWorker()}
+        >
+          Przerwij obliczenia
         </button>
       </div>
-      {completed && (
+      {completed ? (
         <div className="flex items-center p-2 justify-center">
           {hasSolution ? "Rozwiązanie istnieje" : "Rozwiązanie nie istnieje"}.
           Czas wykonania algorytmu: {calculationTime.toFixed(2)} ms
         </div>
-      )}
+      ) : calculating ? (
+        <div className="flex items-center p-2 justify-center">
+          Obliczanie...
+        </div>
+      ) : null}
       <div
         className="grid grid-cols-5 grid-rows-5 w-80 h-80 relative"
         style={{

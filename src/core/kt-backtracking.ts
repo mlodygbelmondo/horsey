@@ -65,4 +65,4 @@ const isSafe = (x: number, y: number, N: number, solution: Solution) => {
   return x >= 0 && x < N && y >= 0 && y < N && solution[x][y] == -1;
 };
 
-export { solveKTAsync, type Solution };
+export { solveKT, solveKTAsync, type Solution };
