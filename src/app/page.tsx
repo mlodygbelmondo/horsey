@@ -3,6 +3,7 @@ import { Solution } from "@/core/kt-backtracking";
 import findElementIn2DArray from "@/utils/find-element-in-2d-array";
 import * as React from "react";
 import { Knight } from "./Knight";
+import { solveWithWarnsdorffs } from "@/core/warnsdorffs-algorithm";
 
 const BOARD_WIDTH = 800;
 const BOARD_HEIGHT = 800;
@@ -28,7 +29,9 @@ const Home = () => {
   const [lines, setLines] = React.useState<Line[]>([]);
   const [hasSolution, setHasSolution] = React.useState(false);
   const [completed, setCompleted] = React.useState(false);
-  const [calculating, setCalculating] = React.useState(false);
+  const [calculating, setCalculating] = React.useState<
+    false | "warnsdorffs" | "backtracking"
+  >(false);
   const [calculationTime, setCalculationTime] = React.useState(0);
   const [startingPosition, setStartingPosition] = React.useState({
     x: 0,
@@ -42,7 +45,7 @@ const Home = () => {
   const startKnightsTour = async () => {
     if (backtrackingAlgorithmWorker.current) {
       setCompleted(false);
-      setCalculating(true);
+      setCalculating("backtracking");
       setLines([]);
       setStartingPosition(knightPosition);
 
@@ -56,10 +59,12 @@ const Home = () => {
 
   React.useEffect(() => {
     backtrackingAlgorithmWorker.current = new Worker(
-      new URL("../workers/backtracking-algorithm-worker.ts", import.meta.url),
+      new URL("../workers/backtracking-algorithm-worker.ts", import.meta.url)
     );
 
     const animateSolution = (solution: Solution) => {
+      console.log(solution);
+
       return new Promise<void>((resolve) => {
         if (solution.length === 0) return;
         let i = 1;
@@ -76,7 +81,7 @@ const Home = () => {
 
             const width = Math.sqrt(
               Math.pow(element[0] - currentX, 2) +
-                Math.pow(element[1] - currentY, 2),
+                Math.pow(element[1] - currentY, 2)
             );
 
             const angle =
@@ -102,7 +107,7 @@ const Home = () => {
 
     if (backtrackingAlgorithmWorker.current) {
       backtrackingAlgorithmWorker.current.onmessage = async (
-        e: MessageEvent<BacktrackingAlgorithmWorkerMessage>,
+        e: MessageEvent<BacktrackingAlgorithmWorkerMessage>
       ) => {
         const { calculationTime, solution } = e.data;
 
@@ -119,6 +124,80 @@ const Home = () => {
       };
     }
   }, [N, backtrackingAlgorithmWorker, knightPosition.x, knightPosition.y]);
+
+  React.useEffect(() => {
+    if (calculating !== "warnsdorffs") {
+      return;
+    }
+
+    const [solution, calculationTime] = solveWithWarnsdorffs(
+      N,
+      knightPosition.x,
+      knightPosition.y
+    );
+
+    const animateSolution = (solution: Solution) => {
+      console.log(solution);
+
+      return new Promise<void>((resolve) => {
+        if (solution.length === 0) return;
+        let i = 1;
+        let currentX = knightPosition.x;
+        let currentY = knightPosition.y;
+        const interval = setInterval(() => {
+          if (i >= N * N) {
+            clearInterval(interval);
+            resolve();
+          }
+          const element = findElementIn2DArray(solution, i);
+          if (element) {
+            setKnightPosition({ x: element[0], y: element[1] });
+
+            const width = Math.sqrt(
+              Math.pow(element[0] - currentX, 2) +
+                Math.pow(element[1] - currentY, 2)
+            );
+
+            const angle =
+              Math.atan2(element[1] - currentY, element[0] - currentX) *
+              (180 / Math.PI);
+
+            const newLine = {
+              x1: currentX,
+              y1: currentY,
+              angle: angle,
+              width,
+            };
+
+            setLines((prev) => [...prev, newLine]);
+
+            currentX = element[0];
+            currentY = element[1];
+          }
+          i++;
+        }, 300);
+      });
+    };
+
+    setCompleted(true);
+    setHasSolution(!!solution);
+    setCalculationTime(calculationTime);
+    if (solution) {
+      void animateSolution(solution);
+    } else {
+      console.log("Solution does not exist");
+      alert("Rozwiązanie nie istnieje");
+    }
+
+    setStartingPosition(knightPosition);
+    setCalculating(false);
+  }, [calculating, knightPosition, N, calculationTime]);
+
+  const runWarnsdorffs = async () => {
+    setCompleted(false);
+    setCalculating("warnsdorffs");
+    setLines([]);
+  };
 
   const renderSquare = (row: number, col: number) => {
     const isDark = (row + col) % 2 === 1;
@@ -157,7 +236,7 @@ const Home = () => {
         <label htmlFor="N">Rozmiar planszy</label>
         <input
           type="number"
-          disabled={calculating}
+          disabled={!!calculating}
           defaultValue={N}
           onChange={(e) => {
             const n = parseInt(e.target.value);
@@ -174,7 +253,7 @@ const Home = () => {
         <input
           defaultValue={`${knightPosition.x},${knightPosition.y}`}
           type="text"
-          disabled={calculating}
+          disabled={!!calculating}
           onChange={(e) => {
             const [x, y] = e.target.value.split(",");
             const xInt = parseInt(x);
@@ -189,11 +268,18 @@ const Home = () => {
       </div>
       <div className="flex items-center justify-center gap-3">
         <button
-          disabled={calculating}
+          disabled={!!calculating}
           className="bg-blue-500 text-white px-4 py-2 rounded my-4 disabled:bg-blue-300 disabled:text-gray-500"
           onClick={() => startKnightsTour()}
         >
-          Oblicz trasę skoczka
+          Backtracking algorithm
+        </button>
+        <button
+          disabled={!!calculating}
+          className="bg-blue-500 text-white px-4 py-2 rounded my-4 disabled:bg-blue-300 disabled:text-gray-500"
+          onClick={() => runWarnsdorffs()}
+        >
+          Warnsdorffs Algorithm
         </button>
         <button
           className="bg-red-500 text-white px-4 py-2 rounded my-4"
