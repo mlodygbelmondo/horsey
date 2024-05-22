@@ -175,7 +175,7 @@ const Home = () => {
             currentY = element[1];
           }
           i++;
-        }, 300);
+        }, 5);
       });
     };
 

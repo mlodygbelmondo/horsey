@@ -1,5 +1,3 @@
-// JavaScript program to for Knight's tour problem using
-// Warnsdorff's algorithm
 class Cell {
   x: number;
   y: number;
@@ -15,8 +13,7 @@ class Cell {
 const cx = [1, 1, 2, 2, -1, -1, -2, -2];
 const cy = [2, -2, 1, -1, 2, -2, 1, -1];
 
-// function restricts the knight to remain within
-// the 8x8 chessboard
+// function restricts the knight to remain within chessboard
 const limits = (x: number, y: number, N: number) => {
   return x >= 0 && y >= 0 && x < N && y < N;
 };
@@ -129,9 +126,6 @@ const findTour = (N: number, sx: number, sy: number): number[][] | false => {
 
   return result;
 };
-
-// Driver Code
-// While we don't get a solution
 
 export const solveWithWarnsdorffs = (
   N: number,
