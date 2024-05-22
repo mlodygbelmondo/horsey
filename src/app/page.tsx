@@ -1,9 +1,9 @@
 "use client";
 import { Solution } from "@/core/kt-backtracking";
+import { solveWithWarnsdorffs } from "@/core/warnsdorffs-algorithm";
 import findElementIn2DArray from "@/utils/find-element-in-2d-array";
 import * as React from "react";
 import { Knight } from "./Knight";
-import { solveWithWarnsdorffs } from "@/core/warnsdorffs-algorithm";
 
 const BOARD_WIDTH = 800;
 const BOARD_HEIGHT = 800;
@@ -38,12 +38,16 @@ const Home = () => {
     y: 0,
   });
 
+  const [numbers, setNumbers] = React.useState([]);
+
   const backtrackingAlgorithmWorker = React.useRef<Worker>();
 
   const cellWidth = BOARD_WIDTH / N;
 
   const startKnightsTour = async () => {
     if (backtrackingAlgorithmWorker.current) {
+      setNumbers([]);
+
       setCompleted(false);
       setCalculating("backtracking");
       setLines([]);
@@ -59,7 +63,7 @@ const Home = () => {
 
   React.useEffect(() => {
     backtrackingAlgorithmWorker.current = new Worker(
-      new URL("../workers/backtracking-algorithm-worker.ts", import.meta.url)
+      new URL("../workers/backtracking-algorithm-worker.ts", import.meta.url),
     );
 
     const animateSolution = (solution: Solution) => {
@@ -81,7 +85,7 @@ const Home = () => {
 
             const width = Math.sqrt(
               Math.pow(element[0] - currentX, 2) +
-                Math.pow(element[1] - currentY, 2)
+                Math.pow(element[1] - currentY, 2),
             );
 
             const angle =
@@ -107,7 +111,7 @@ const Home = () => {
 
     if (backtrackingAlgorithmWorker.current) {
       backtrackingAlgorithmWorker.current.onmessage = async (
-        e: MessageEvent<BacktrackingAlgorithmWorkerMessage>
+        e: MessageEvent<BacktrackingAlgorithmWorkerMessage>,
       ) => {
         const { calculationTime, solution } = e.data;
 
@@ -130,10 +134,12 @@ const Home = () => {
       return;
     }
 
+    setNumbers([]);
+
     const [solution, calculationTime] = solveWithWarnsdorffs(
       N,
       knightPosition.x,
-      knightPosition.y
+      knightPosition.y,
     );
 
     const animateSolution = (solution: Solution) => {
@@ -155,7 +161,7 @@ const Home = () => {
 
             const width = Math.sqrt(
               Math.pow(element[0] - currentX, 2) +
-                Math.pow(element[1] - currentY, 2)
+                Math.pow(element[1] - currentY, 2),
             );
 
             const angle =
@@ -199,7 +205,7 @@ const Home = () => {
     setLines([]);
   };
 
-  const renderSquare = (row: number, col: number) => {
+  const renderSquare = (row: number, col: number, num?: number) => {
     const isDark = (row + col) % 2 === 1;
     return (
       <div
@@ -209,7 +215,18 @@ const Home = () => {
           width: BOARD_WIDTH / N,
           height: BOARD_HEIGHT / N,
         }}
-      />
+      >
+        {num !== undefined ? (
+          <div
+            className="flex items-center justify-center h-full w-full text-black"
+            style={{
+              fontSize: cellWidth / 2.5,
+            }}
+          >
+            {num}
+          </div>
+        ) : null}
+      </div>
     );
   };
 
@@ -217,7 +234,10 @@ const Home = () => {
     let board = [];
     for (let row = 0; row < N; row++) {
       for (let col = 0; col < N; col++) {
-        board.push(renderSquare(row, col));
+        const isInLines = lines.findIndex((l) => l.x1 === col && l.y1 === row);
+        board.push(
+          renderSquare(row, col, isInLines !== -1 ? isInLines + 1 : undefined),
+        );
       }
     }
     return board;
@@ -319,7 +339,7 @@ const Home = () => {
           <Knight />
         </div>
         {renderBoard()}
-        {lines.map((line, index) => (
+        {/* {lines.map((line, index) => (
           <div
             key={index}
             className="absolute"
@@ -333,14 +353,14 @@ const Home = () => {
               transformOrigin: "0 0",
             }}
           />
-        ))}
-        <div
+        ))} */}
+        {/* <div
           className="bg-[#ff0000] w-3 h-3 rounded-full absolute"
           style={{
             top: startingPosition.y * cellWidth + cellWidth / 2 - 6,
             left: startingPosition.x * cellWidth + cellWidth / 2 - 6,
           }}
-        />
+        /> */}
       </div>
     </div>
   );
